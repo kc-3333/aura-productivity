@@ -1,0 +1,364 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Aura - Zen Dark Kanban</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.js"></script>
+<script>
+window.addEventListener('DOMContentLoaded', () => {
+  // === Pomodoro Timer ===
+  const startBtn = document.getElementById("pomodoro-start-pause");
+  const resetBtn = document.getElementById("pomodoro-reset");
+  const timeDisplay = document.getElementById("pomodoro-time-display");
+  const workSlider = document.getElementById("work-duration");
+  const breakSlider = document.getElementById("break-duration");
+  const workValue = document.getElementById("work-value");
+  const breakValue = document.getElementById("break-value");
+  const pomodoroStatus = document.getElementById("pomodoro-status");
+  const pomodoroCount = document.getElementById("pomodoro-count");
+
+  let isRunning = false;
+  let isWorkSession = true;
+  let timer;
+  let sessionCount = 0;
+  let timeLeft = parseInt(workSlider.value) * 60;
+
+  function updateDisplay() {
+    const min = String(Math.floor(timeLeft / 60)).padStart(2, '0');
+    const sec = String(timeLeft % 60).padStart(2, '0');
+    timeDisplay.textContent = `${min}:${sec}`;
+  }
+
+  function toggleSession() {
+    isWorkSession = !isWorkSession;
+    timeLeft = parseInt(isWorkSession ? workSlider.value : breakSlider.value) * 60;
+    pomodoroStatus.textContent = isWorkSession ? "Work session..." : "Break time!";
+    updateDisplay();
+  }
+
+  function tick() {
+    if (timeLeft > 0) {
+      timeLeft--;
+      updateDisplay();
+    } else {
+      clearInterval(timer);
+      isRunning = false;
+      sessionCount++;
+      pomodoroCount.textContent = `Completed Sessions: ${sessionCount}`;
+      Tone.start();
+      const synth = new Tone.Synth().toDestination();
+      synth.triggerAttackRelease("C5", "8n");
+      toggleSession();
+      startBtn.textContent = "Start";
+    }
+  }
+
+  function startTimer() {
+    
+    if (!isRunning) {
+      timer = setInterval(tick, 1000);
+      isRunning = true;
+      startBtn.textContent = "Pause";
+      pomodoroStatus.textContent = isWorkSession ? "Work session..." : "Break time!";
+    }
+  }
+
+  function pauseTimer() {
+    
+    clearInterval(timer);
+    isRunning = false;
+    startBtn.textContent = "Resume";
+    pomodoroStatus.textContent = "Paused.";
+  }
+
+  startBtn.addEventListener("click", () => {
+    if (isRunning) {
+      pauseTimer();
+    } else {
+      startTimer();
+    }
+  });
+
+  resetBtn.addEventListener("click", () => {
+    document.querySelectorAll('#targets input, #new-task-input, #add-task-btn, .move-left, .move-right, .task button').forEach(el => el.removeAttribute('disabled'));
+    clearInterval(timer);
+    isRunning = false;
+    isWorkSession = true;
+    timeLeft = parseInt(workSlider.value) * 60;
+    updateDisplay();
+    startBtn.textContent = "Start";
+    pomodoroStatus.textContent = "Ready to work!";
+  });
+
+  workSlider.addEventListener("input", () => {
+    workValue.textContent = workSlider.value;
+    if (!isRunning && isWorkSession) {
+      timeLeft = parseInt(workSlider.value) * 60;
+      updateDisplay();
+    }
+  });
+
+  breakSlider.addEventListener("input", () => {
+    breakValue.textContent = breakSlider.value;
+  });
+
+  updateDisplay();
+
+  // === Today's Targets ===
+  const targetStats = document.getElementById("target-stats");
+  const targetCheckboxes = document.querySelectorAll("#targets input[type='checkbox']");
+  const targetInputs = document.querySelectorAll("#targets input[type='text']");
+  function updateTargetStats() {
+    let count = 0;
+    targetInputs.forEach((input, i) => {
+      if (input.value.trim() && targetCheckboxes[i].checked) count++;
+      targetCheckboxes[i].closest("div").classList.toggle("line-through", targetCheckboxes[i].checked);
+    });
+    targetStats.textContent = `Completed Targets: ${count} / 3`;
+  }
+  targetCheckboxes.forEach(cb => cb.addEventListener("change", updateTargetStats));
+  updateTargetStats();
+  // === Add Task ===
+  const taskInput = document.getElementById("new-task-input");
+  const addTaskBtn = document.getElementById("add-task-btn");
+  const errorMessage = document.getElementById("error-message");
+  const todoColumn = document.getElementById("todo-column");
+  const taskStats = document.getElementById("task-stats");
+  const columns = ["todo-column", "inprogress-column", "done-column"];
+
+  function updateTaskStats() {
+    const count = document.querySelectorAll('#done-column .task').length;
+    taskStats.textContent = `Completed Tasks: ${count}`;
+  }
+
+  function createTask(text) {
+    const task = document.createElement("div");
+    task.className = "task bg-[#111] border border-white p-2 rounded relative cursor-grab opacity-0 scale-95 transition-all duration-300";
+    task.setAttribute("draggable", "true");
+    task.setAttribute("tabindex", "0");
+    task.innerHTML = `
+      <div class='flex items-center gap-2'>
+        <div class='flex gap-1'>
+          <button class='move-left text-xs px-1 border border-white'>&lt;</button>
+          <button class='move-right text-xs px-1 border border-white'>&gt;</button>
+        </div>
+        <span contenteditable='true' class='inline-block w-full text-white'>${text}</span>
+        <button class='absolute top-1 right-2 text-white'>×</button>
+      </div>
+    `;
+    setTimeout(() => task.classList.remove("opacity-0", "scale-95"), 10);
+    task.addEventListener("dragstart", () => task.classList.add("dragging"));
+    task.addEventListener("dragend", () => task.classList.remove("dragging"));
+    return task;
+  }
+
+  addTaskBtn.addEventListener("click", () => {
+    const text = taskInput.value.trim();
+    if (!text) {
+      errorMessage.classList.remove("hidden");
+      return;
+    }
+    errorMessage.classList.add("hidden");
+    const task = createTask(text);
+    todoColumn.appendChild(task);
+    taskInput.value = "";
+    updateTaskStats();
+  });
+
+  taskInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addTaskBtn.click();
+    }
+  });
+
+  document.addEventListener("click", e => {
+    const task = e.target.closest(".task");
+    if (!task) return;
+    if (e.target.classList.contains("move-left")) moveTask(task, -1);
+    if (e.target.classList.contains("move-right")) moveTask(task, 1);
+    if (e.target.textContent === "×") {
+      task.remove();
+      updateTaskStats();
+    }
+  });
+
+  document.addEventListener("keydown", e => {
+    if (document.activeElement?.classList.contains("task")) {
+      if (e.key === "ArrowRight") moveTask(document.activeElement, 1);
+      if (e.key === "ArrowLeft") moveTask(document.activeElement, -1);
+    }
+  });
+
+  document.querySelectorAll(".tasks").forEach(column => {
+    column.addEventListener("dragover", e => {
+      e.preventDefault();
+      column.classList.add("drag-over");
+    });
+    column.addEventListener("dragleave", () => column.classList.remove("drag-over"));
+    column.addEventListener("drop", e => {
+      e.preventDefault();
+      const dragging = document.querySelector(".dragging");
+      if (dragging) {
+        column.appendChild(dragging);
+        dragging.classList.remove("dragging");
+        column.classList.remove("drag-over");
+        updateTaskStats();
+      }
+    });
+  });
+
+  function moveTask(task, direction) {
+    const current = task.closest(".tasks");
+    const currentIndex = columns.findIndex(id => current.id === id);
+    const newIndex = currentIndex + direction;
+    if (columns[newIndex]) {
+      const newCol = document.getElementById(columns[newIndex]);
+      newCol.appendChild(task);
+      updateTaskStats();
+    }
+  }
+});
+</script>
+  <style>
+    body.light { background-color: #fff; color: #000; }
+    body.light .task { background-color: #f3f4f6; color: #111827; border-color: #d1d5db; }
+    body.light .tasks.drag-over { background-color: #e5e7eb; border-color: #9ca3af; }
+    body.light input, body.light button { background-color: #fff; color: #111827; }
+    body {
+    transition: opacity 0.4s ease; font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; padding: 0; min-height: 100vh; }
+    header { display: flex; align-items: center; padding: 2rem; cursor: pointer; }
+    .logo { width: 2.25rem; height: 2.25rem; background: #fff; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff inset; margin-right: 1rem; }
+    .page-title { font-weight: 700; font-size: 2rem; text-transform: uppercase; }
+    .line-through input[type="text"] { text-decoration: line-through; border: none; color: #aaa; }
+    .stat { font-size: 0.875rem; color: #9ca3af; margin-top: 0.5rem; }
+    .tasks.drag-over {
+      outline: 2px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 0.5rem;
+      opacity: 0.7;
+      border-color: rgba(255, 255, 255, 0.4);
+      transition: border-color 0.2s ease-in-out;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    .section-hover:hover {
+  transform: scale(1.01);
+  background-color: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+}
+  .section-hover {
+  transition: all 0.35s ease-in-out;
+  transition-delay: 0.05s;
+}
+  .section-hover:hover {
+    transform: scale(1.01);
+    background-color: rgba(255, 255, 255, 0.03);
+    box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+  }
+  
+</style>
+</head>
+<body class="dark">
+  <header>
+  <span class="logo"></span>
+  <h1 class="page-title">Aura</h1>
+</header>
+  <div class="px-4 pb-2 flex gap-2">
+  <button id="reset-btn" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition">Reset</button>
+  <button id="theme-toggle" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition flex items-center justify-center">
+  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+  <path id="theme-icon" d="M12 2.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75Zm0 16.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75ZM4.72 4.72a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L4.72 5.78a.75.75 0 0 1 0-1.06Zm12.5 12.5a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06l-1.06-1.06a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm16.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM5.78 18.22a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 0 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0Zm12.5-12.5a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0ZM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Z" />
+</svg>
+</button>
+</div>
+  <main class="p-4 space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="border-2 border-white rounded-lg p-4 section-hover">
+    <h2 class="text-lg font-semibold mb-2">Today's Targets</h2>
+    <div class="space-y-2" id="targets">
+      <div class="flex items-center justify-between border border-white p-2 rounded">
+        <input type="text" placeholder="Target 1" class="bg-black text-white w-full focus:outline-none" />
+        <input type="checkbox" class="ml-2 accent-white" />
+      </div>
+      <div class="flex items-center justify-between border border-white p-2 rounded">
+        <input type="text" placeholder="Target 2" class="bg-black text-white w-full focus:outline-none" />
+        <input type="checkbox" class="ml-2 accent-white" />
+      </div>
+      <div class="flex items-center justify-between border border-white p-2 rounded">
+        <input type="text" placeholder="Target 3" class="bg-black text-white w-full focus:outline-none" />
+        <input type="checkbox" class="ml-2 accent-white" />
+      </div>
+    </div>
+    <div id="target-stats" class="stat">Completed Targets: 0 / 3</div>
+  </div>
+
+  <div class="border-2 border-white rounded-lg p-4 section-hover">
+    <h2 class="text-lg font-semibold mb-2">Add Task</h2>
+    <input type="text" id="new-task-input" placeholder="New task..." class="w-full bg-black border border-white p-2 text-white mb-2">
+    <button id="add-task-btn" class="w-full border border-white py-2">Add</button>
+    <p id="error-message" class="text-white text-sm text-opacity-80 hidden mt-2">Please enter a task.</p>
+    <div id="task-stats" class="stat">Completed Tasks: 0</div>
+  </div>
+
+  <div class="border-2 border-white rounded-lg p-4 section-hover">
+    <h2 class="text-lg font-semibold mb-2">Pomodoro</h2>
+    <div id="pomodoro-time-display" class="text-3xl font-bold mb-2">25:00</div>
+    <div class="space-x-2 mb-4">
+      <button id="pomodoro-start-pause" class="border border-white px-4 py-1">Start</button>
+      <button id="pomodoro-reset" class="border border-white px-4 py-1">Reset</button>
+    </div>
+    <div>
+      <label>Work: <span id="work-value">25</span> min</label>
+      <input type="range" id="work-duration" min="5" max="60" value="25" class="w-full accent-white">
+      <label>Break: <span id="break-value">5</span> min</label>
+      <input type="range" id="break-duration" min="1" max="30" value="5" class="w-full accent-white">
+    </div>
+    <div id="pomodoro-status" class="text-sm mt-2 text-gray-400">Ready to work!</div>
+    <div id="pomodoro-count" class="stat">Completed Sessions: 0</div>
+  </div>
+</section>
+
+<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+  <div class="border-2 border-white rounded-lg section-hover">
+    <h2 class="text-lg font-semibold border-b border-white p-2">To Do</h2>
+    <div class="tasks p-2 space-y-2" id="todo-column"></div>
+  </div>
+  <div class="border-2 border-white rounded-lg section-hover">
+    <h2 class="text-lg font-semibold border-b border-white p-2">In Progress</h2>
+    <div class="tasks p-2 space-y-2" id="inprogress-column"></div>
+  </div>
+  <div class="border-2 border-white rounded-lg section-hover">
+    <h2 class="text-lg font-semibold border-b border-white p-2">Done</h2>
+    <div class="tasks p-2 space-y-2" id="done-column"></div>
+  </div>
+</section>
+  </main>
+  <script>
+  window.addEventListener('DOMContentLoaded', () => {
+    document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const iconPath = document.getElementById('theme-icon');
+
+      const isLight = document.body.classList.toggle('light');
+      document.body.classList.toggle('dark', !isLight);
+      localStorage.setItem('theme', isLight ? 'light' : 'dark');
+  if (iconPath) {
+    iconPath.setAttribute('d', 'M12 2.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75Zm0 16.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75ZM4.72 4.72a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L4.72 5.78a.75.75 0 0 1 0-1.06Zm12.5 12.5a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06l-1.06-1.06a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm16.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM5.78 18.22a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 0 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0Zm12.5-12.5a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0ZM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Z');
+  }
+    });
+
+    const savedTheme = localStorage.getItem('theme');
+    if (savedTheme) {
+      document.body.classList.remove('light', 'dark');
+      document.body.classList.add(savedTheme);
+    }
+
+    document.getElementById('reset-btn')?.addEventListener('click', () => {
+  document.body.classList.add('opacity-0');
+  setTimeout(() => location.reload(), 400);
+});
+  });
+</script>
+<div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-4 py-2 rounded shadow opacity-0 pointer-events-none transition-opacity duration-500 z-50">Reset successful</div>
+</body>
+</html>
