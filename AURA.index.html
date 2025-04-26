@@ -6,11 +6,230 @@
   <title>Aura - Zen Dark Kanban</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/tone/14.8.39/Tone.js"></script>
-<script>
+  <style>
+    body.light { background-color: #F9F8F0; color: #000; }
+    body.light .task { background-color: #f3f4f6; color: #111827; border-color: #000; }
+    body.light .tasks.drag-over { background-color: #F9F8F0; border-color: #000; }
+    body.light input, body.light button { background-color: #fff; color: #111827; border-color: #000; }
+    body.light .section-hover { background-color: #F9F8F0; color: #111827; border-color: #000; }
+    body.light .logo {
+        background: #000;
+        box-shadow: 0 0 0 2px #000 inset;
+    }
+    body.light .tasks,
+    body.light .task,
+    body.light .task span { color: #000; }
+    body.light #targets .flex { background-color: #F9F8F0; border-color: #000; }
+    body.light #targets input[type="text"] { background-color: #F9F8F0; }
+    body.light #new-task-input[type="text"] { background-color: #F9F8F0; }
+    body {
+      transition: opacity 0.4s ease; font-family: 'Inter', sans-serif;
+      background-color: #000; color: #fff; margin: 0; padding: 0; min-height: 100vh;
+    }
+    header { display: flex; align-items: center; padding: 2rem; cursor: pointer; }
+    .logo { width: 2.25rem; height: 2.25rem; background: #fff; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff inset; margin-right: 1rem; }
+    .page-title { font-weight: 700; font-size: 2rem; text-transform: uppercase; }
+    .line-through input[type="text"] {
+      text-decoration: line-through;
+      border: none;
+      color: inherit;
+    }
+    .stat { font-size: 0.875rem; color: #9ca3af; margin-top: 0.5rem; }
+    .tasks.drag-over {
+      outline: 2px dashed rgba(255, 255, 255, 0.4);
+      border-radius: 0.5rem;
+      opacity: 0.7;
+      border-color: rgba(255, 255, 255, 0.05);
+      transition: border-color 0.2s ease-in-out;
+      background-color: rgba(255, 255, 255, 0.05);
+    }
+    /* Sidebar styles */
+  /* Sidebar styles */
+    #sidebar {
+      width: 12rem; /* Sidebar width */
+      background-color: #111; /* Sidebar background color */
+      color: #fff; /* Sidebar text color */
+      transform: translateX(-100%); /* Start off-screen */
+      transition: transform 0.3s ease-in-out; /* Smooth slide-in/out animation */
+      z-index: 50; /* Ensure it appears above other elements */
+    }
+
+    body.sidebar-open #sidebar {
+      transform: translateX(0); /* Slide the sidebar into view */
+      transition: transform 0.3s ease-in-out; /* Ensure the same speed for opening */
+    }
+
+    body.sidebar-open {
+      overflow-x: hidden; /* Prevent horizontal scrolling when sidebar is open */
+    }
+
+    body.sidebar-open header,
+    body.sidebar-open main,
+    body.sidebar-open .px-6 {
+      margin-left: 12rem; /* Add margin to make space for the sidebar */
+      width: calc(100% - 12rem); /* Dynamically adjust the width */
+      transition: margin-left 0.3s ease-in-out, width 0.3s ease-in-out; /* Match the sidebar transition */
+    }
+
+    .section-hover {
+      transition: all 0.35s ease-in-out;
+      transition-delay: 0.05s;
+    }
+    .section-hover:hover {
+      transform: scale(1.01);
+      background-color: rgba(255, 255, 255, 0.03);
+      box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
+    }
+    .light .week-bar-wrapper { background-color: rgba(0, 0, 0, 0.2); }
+    .light .week-bar-fill { background-color: #000; }
+    .light .location-select { background-color: #F9F8F0; color: #000; }
+    .dark .location-select { background-color: #000; color: #fff; }
+  </style>
+</head>
+<body class="dark">
+  <div id="sidebar" class="fixed top-0 left-0 h-full w-64 bg-black text-white transform -translate-x-full transition-transform duration-300 z-50">
+    <div class="p-4">
+      <div class="flex items-center gap-2">
+        <span class="logo"></span>
+        <h2 class="text-lg font-semibold">AURA</h2>
+      </div>
+      <ul class="mt-4 space-y-2">
+        <ul class="mt-4 space-y-2">
+          <li><a href="AURA.index.html" class="block px-2 py-1 hover:bg-gray-700 rounded">Focus</a></li>
+          <li><a href="calculator.index.html" class="block px-2 py-1 bg-gray-700 rounded">Calculator</a></li>
+        </ul>
+      </ul>
+    </div>
+  </div>
+  <header class="px-6 md:px-12">
+    <span class="logo"></span>
+    <h1 class="page-title">Aura | FOCUS</h1>
+  </header>
+  <div class="px-6 md:px-12 pb-2 flex flex-col md:flex-row md:flex-wrap md:items-center md:gap-x-2 md:gap-y-1 gap-2 whitespace-normal">
+    <button id="sidebar-toggle" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition flex items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+      </svg>
+    </button>
+<button id="reset-btn" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition">Reset</button>
+
+<button id="theme-toggle" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition flex items-center justify-center">
+      <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
+        <path id="theme-icon" d="M6.995 12c0 2.761 2.246 5.005 5.005 5.005s5.005-2.244 5.005-5.005c0-2.76-2.246-5.005-5.005-5.005s-5.005 2.245-5.005 5.005zm12.005-.75h2a.75.75 0 0 1 0 1.5h-2a.75.75 0 0 1 0-1.5zm-16 0h2a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1 0-1.5zm7.25-7.25V2a.75.75 0 0 1 1.5 0v2a.75.75 0 0 1-1.5 0zm0 16v-2a.75.75 0 0 1 1.5 0v2a.75.75 0 0 1-1.5 0zm6.364-13.614l1.414-1.414a.75.75 0 0 1 1.061 1.06l-1.414 1.415a.75.75 0 1 1-1.061-1.06zm-12.728 0a.75.75 0 0 1 1.06 1.06L5.278 7.146a.75.75 0 0 1-1.06-1.06l1.414-1.415zm12.728 12.728a.75.75 0 0 1 0-1.06l1.414-1.415a.75.75 0 0 1 1.06 1.06l-1.414 1.415a.75.75 0 0 1-1.06 0zm-12.728 0l1.414-1.415a.75.75 0 1 1 1.06 1.06L5.278 18.72a.75.75 0 1 1-1.06-1.06z" />
+      </svg>
+    </button>
+    <span id="location" class="text-xs">
+      <span class="filter grayscale">📍</span>
+      <select id="location-select" class="location-select border-0 rounded px-1 py-0.5 transition-colors duration-200">
+        <option value="MY">Malaysia</option>
+        <option value="SG">Singapore</option>
+        <option value="TH">Thailand</option>
+        <option value="PH">Philippines</option>
+        <option value="ID">Indonesia</option>
+      </select>
+    </span>
+    <span id="datetime" class="text-xs"><span class="filter grayscale">📅</span> Loading...</span>
+    <span id="week" class="text-xs"><span class="filter grayscale">🗓️</span> Week --</span>
+  </div>
+  <main class="px-6 md:px-12 py-4 space-y-6">
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="border-2 border-white rounded-lg p-4 section-hover">
+        <h2 class="text-lg font-semibold mb-2">Today's Targets</h2>
+        <div class="space-y-2" id="targets">
+          <div class="flex items-center justify-between border border-white p-2 rounded">
+            <input type="text" placeholder="Target 1" class="bg-black text-white w-full focus:outline-none focus:text-white" />
+            <input type="checkbox" class="ml-2 accent-white" />
+          </div>
+          <div class="flex items-center justify-between border border-white p-2 rounded">
+            <input type="text" placeholder="Target 2" class="bg-black text-white w-full focus:outline-none focus:text-white" />
+            <input type="checkbox" class="ml-2 accent-white" />
+          </div>
+          <div class="flex items-center justify-between border border-white p-2 rounded">
+            <input type="text" placeholder="Target 3" class="bg-black text-white w-full focus:outline-none focus:text-white" />
+            <input type="checkbox" class="ml-2 accent-white" />
+          </div>
+        </div>
+        <div id="target-stats" class="stat">Completed Targets: 0 / 3</div>
+      </div>
+      <div class="border-2 border-white rounded-lg p-4 section-hover">
+        <h2 class="text-lg font-semibold mb-2">Add Task</h2>
+        <input type="text" id="new-task-input" placeholder="New task..." class="w-full bg-black border border-white p-2 text-white mb-2">
+        <button id="add-task-btn" class="w-full border border-white py-2">Add</button>
+        <p id="error-message" class="text-white text-sm text-opacity-80 hidden mt-2">Please enter a task.</p>
+        <div id="task-stats" class="stat">Completed Tasks: 0</div>
+      </div>
+      <div class="border-2 border-white rounded-lg p-4 section-hover">
+        <h2 class="text-lg font-semibold mb-2">Pomodoro</h2>
+        <div id="pomodoro-time-display" class="text-3xl font-bold mb-2">25:00</div>
+        <div class="space-x-2 mb-4">
+          <button id="pomodoro-start-pause" class="border border-white px-4 py-1">Start</button>
+          <button id="pomodoro-reset" class="border border-white px-4 py-1">Reset</button>
+        </div>
+        <div>
+          <label>Work: <span id="work-value">25</span> min</label>
+          <input type="range" id="work-duration" min="5" max="60" value="25" class="w-full accent-white">
+          <label>Break: <span id="break-value">5</span> min</label>
+          <input type="range" id="break-duration" min="1" max="30" value="5" class="w-full accent-white">
+        </div>
+        <div id="pomodoro-status" class="text-sm mt-2 text-gray-400">Ready to work!</div>
+        <div id="pomodoro-count" class="stat">Completed Sessions: 0</div>
+      </div>
+    </section>
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div class="border-2 border-white rounded-lg section-hover">
+        <h2 class="text-lg font-semibold border-b border-white p-2">To Do</h2>
+        <div class="tasks p-2 space-y-2" id="todo-column"></div>
+      </div>
+      <div class="border-2 border-white rounded-lg section-hover">
+        <h2 class="text-lg font-semibold border-b border-white p-2">In Progress</h2>
+        <div class="tasks p-2 space-y-2" id="inprogress-column"></div>
+      </div>
+      <div class="border-2 border-white rounded-lg section-hover">
+        <h2 class="text-lg font-semibold border-b border-white p-2">Done</h2>
+        <div class="tasks p-2 space-y-2" id="done-column"></div>
+      </div>
+    </section>
+  </main>
+  <div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-4 py-2 rounded shadow opacity-0 pointer-events-none transition-opacity duration-500 z-50">Reset successful</div>
+  <script>
+// === Theme toggle ===
+document.getElementById('theme-toggle')?.addEventListener('click', () => {
+  const iconPath = document.getElementById('theme-icon');
+  const isLight = document.body.classList.toggle('light');
+  document.body.classList.toggle('dark', !isLight);
+  localStorage.setItem('theme', isLight ? 'light' : 'dark');
+});
+const savedTheme = localStorage.getItem('theme');
+if (savedTheme) {
+  document.body.classList.remove('light', 'dark');
+  document.body.classList.add(savedTheme);
+}
+
 window.addEventListener('DOMContentLoaded', () => {
-  // === Pomodoro Timer ===
+  const datetimeSpan = document.getElementById("datetime");
+  const weekSpan = document.getElementById("week");
+  function updateDateTime() {
+    const now = new Date();
+    const options = { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+    datetimeSpan.innerHTML = `<span class='filter grayscale'>📅</span> ${now.toLocaleString('en-US', options)}`;
+    const oneJan = new Date(now.getFullYear(), 0, 1);
+    const week = Math.ceil((((now - oneJan) / 86400000) + oneJan.getDay() + 1) / 7);
+    const percent = ((now - oneJan) / (365 * 86400000) * 100).toFixed(1);
+    weekSpan.innerHTML = `<span class='filter grayscale'>🗓️</span> Week ${week}
+      <div class='w-24 h-2 ml-2 inline-block align-middle overflow-hidden rounded week-bar-wrapper dark:bg-white/20'>
+        <div class='h-full rounded week-bar-fill dark:bg-white' style='width: ${percent}%'>&nbsp;</div>
+      </div>`;
+  }
+  updateDateTime();
+  setInterval(updateDateTime, 60000);
+
+  const locationSelect = document.getElementById("location-select");
+  locationSelect?.addEventListener("change", (e) => {
+    console.log("Selected country:", e.target.value);
+  });
+
   const startBtn = document.getElementById("pomodoro-start-pause");
-  const resetBtn = document.getElementById("pomodoro-reset");
+  const resetBtn = document.getElementById("reset-btn");
   const timeDisplay = document.getElementById("pomodoro-time-display");
   const workSlider = document.getElementById("work-duration");
   const breakSlider = document.getElementById("break-duration");
@@ -18,12 +237,30 @@ window.addEventListener('DOMContentLoaded', () => {
   const breakValue = document.getElementById("break-value");
   const pomodoroStatus = document.getElementById("pomodoro-status");
   const pomodoroCount = document.getElementById("pomodoro-count");
+  const pomodoroResetBtn = document.getElementById("pomodoro-reset");
+  const sidebarToggleBtn = document.getElementById("sidebar-toggle");
+  const body = document.body;
+
 
   let isRunning = false;
   let isWorkSession = true;
   let timer;
   let sessionCount = 0;
   let timeLeft = parseInt(workSlider.value) * 60;
+
+  pomodoroResetBtn.addEventListener("click", () => {
+    clearInterval(timer); // Stop the timer
+    isRunning = false; // Set the timer state to not running
+    isWorkSession = true; // Reset to work session
+    timeLeft = parseInt(workSlider.value) * 60; // Reset time to the work slider value
+    updateDisplay(); // Update the timer display
+    startBtn.textContent = "Start"; // Reset the button text
+    pomodoroStatus.textContent = "Ready to work!"; // Reset the status text
+  });
+
+  sidebarToggleBtn.addEventListener("click", () => {
+    body.classList.toggle("sidebar-open"); // Toggle the sidebar-open class on the body
+  });
 
   function updateDisplay() {
     const min = String(Math.floor(timeLeft / 60)).padStart(2, '0');
@@ -35,7 +272,6 @@ window.addEventListener('DOMContentLoaded', () => {
     isWorkSession = !isWorkSession;
     timeLeft = parseInt(isWorkSession ? workSlider.value : breakSlider.value) * 60;
     pomodoroStatus.textContent = isWorkSession ? "Work session..." : "Break time!";
-    updateDisplay();
   }
 
   function tick() {
@@ -43,20 +279,17 @@ window.addEventListener('DOMContentLoaded', () => {
       timeLeft--;
       updateDisplay();
     } else {
-      clearInterval(timer);
-      isRunning = false;
-      sessionCount++;
-      pomodoroCount.textContent = `Completed Sessions: ${sessionCount}`;
       Tone.start();
       const synth = new Tone.Synth().toDestination();
       synth.triggerAttackRelease("C5", "8n");
+      sessionCount++;
+      pomodoroCount.textContent = `Completed Sessions: ${sessionCount}`;
       toggleSession();
-      startBtn.textContent = "Start";
+      updateDisplay();
     }
   }
 
   function startTimer() {
-    
     if (!isRunning) {
       timer = setInterval(tick, 1000);
       isRunning = true;
@@ -66,30 +299,46 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 
   function pauseTimer() {
-    
     clearInterval(timer);
     isRunning = false;
     startBtn.textContent = "Resume";
     pomodoroStatus.textContent = "Paused.";
   }
 
-  startBtn.addEventListener("click", () => {
-    if (isRunning) {
-      pauseTimer();
-    } else {
-      startTimer();
-    }
+  startBtn.addEventListener("click", async () => {
+    await Tone.start();
+    if (isRunning) pauseTimer();
+    else startTimer();
   });
 
   resetBtn.addEventListener("click", () => {
-    document.querySelectorAll('#targets input, #new-task-input, #add-task-btn, .move-left, .move-right, .task button').forEach(el => el.removeAttribute('disabled'));
-    clearInterval(timer);
-    isRunning = false;
-    isWorkSession = true;
-    timeLeft = parseInt(workSlider.value) * 60;
-    updateDisplay();
-    startBtn.textContent = "Start";
-    pomodoroStatus.textContent = "Ready to work!";
+    document.body.classList.add('opacity-0');
+    setTimeout(() => {
+      clearInterval(timer);
+      isRunning = false;
+      isWorkSession = true;
+      sessionCount = 0;
+      timeLeft = 25 * 60;
+      workSlider.value = 25;
+      breakSlider.value = 5;
+      workValue.textContent = "25";
+      breakValue.textContent = "5";
+      updateDisplay();
+      startBtn.textContent = "Start";
+      pomodoroStatus.textContent = "Ready to work!";
+      pomodoroCount.textContent = "Completed Sessions: 0";
+      document.querySelectorAll('#targets input[type="text"]').forEach(el => el.value = "");
+      document.querySelectorAll('#targets input[type="checkbox"]').forEach(cb => cb.checked = false);
+      updateTargetStats();
+      columns.forEach(id => document.getElementById(id).innerHTML = "");
+      updateTaskStats();
+      const toast = document.getElementById('toast');
+      toast.classList.remove('opacity-0', 'pointer-events-none');
+      setTimeout(() => {
+        toast.classList.add('opacity-0', 'pointer-events-none');
+      }, 2000);
+      document.body.classList.remove('opacity-0');
+    }, 400);
   });
 
   workSlider.addEventListener("input", () => {
@@ -100,13 +349,9 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  breakSlider.addEventListener("input", () => {
-    breakValue.textContent = breakSlider.value;
-  });
-
+  breakSlider.addEventListener("input", () => breakValue.textContent = breakSlider.value);
   updateDisplay();
 
-  // === Today's Targets ===
   const targetStats = document.getElementById("target-stats");
   const targetCheckboxes = document.querySelectorAll("#targets input[type='checkbox']");
   const targetInputs = document.querySelectorAll("#targets input[type='text']");
@@ -120,7 +365,7 @@ window.addEventListener('DOMContentLoaded', () => {
   }
   targetCheckboxes.forEach(cb => cb.addEventListener("change", updateTargetStats));
   updateTargetStats();
-  // === Add Task ===
+
   const taskInput = document.getElementById("new-task-input");
   const addTaskBtn = document.getElementById("add-task-btn");
   const errorMessage = document.getElementById("error-message");
@@ -174,14 +419,24 @@ window.addEventListener('DOMContentLoaded', () => {
     }
   });
 
-  document.addEventListener("click", e => {
+  document.addEventListener("click", (e) => {
     const task = e.target.closest(".task");
     if (!task) return;
+  
     if (e.target.classList.contains("move-left")) moveTask(task, -1);
     if (e.target.classList.contains("move-right")) moveTask(task, 1);
+  
     if (e.target.textContent === "×") {
-      task.remove();
-      updateTaskStats();
+      // Add fade-out and scale-down effect
+      task.style.transition = "opacity 0.3s ease, transform 0.3s ease";
+      task.style.opacity = "0";
+      task.style.transform = "scale(0.9)";
+  
+      // Remove the task after the animation completes
+      setTimeout(() => {
+        task.remove();
+        updateTaskStats();
+      }, 300); // Match the duration of the transition
     }
   });
 
@@ -189,6 +444,12 @@ window.addEventListener('DOMContentLoaded', () => {
     if (document.activeElement?.classList.contains("task")) {
       if (e.key === "ArrowRight") moveTask(document.activeElement, 1);
       if (e.key === "ArrowLeft") moveTask(document.activeElement, -1);
+    }
+  });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.key === "Escape" && body.classList.contains("sidebar-open")) {
+      body.classList.remove("sidebar-open"); // Close the sidebar
     }
   });
 
@@ -210,6 +471,13 @@ window.addEventListener('DOMContentLoaded', () => {
     });
   });
 
+  document.querySelector('a[href="AURA.index.html"]').addEventListener('click', (e) => {
+    e.preventDefault(); // Prevent the default link behavior
+    if (body.classList.contains('sidebar-open')) {
+      body.classList.remove('sidebar-open'); // Close the sidebar
+    }
+  });
+
   function moveTask(task, direction) {
     const current = task.closest(".tasks");
     const currentIndex = columns.findIndex(id => current.id === id);
@@ -222,143 +490,5 @@ window.addEventListener('DOMContentLoaded', () => {
   }
 });
 </script>
-  <style>
-    body.light { background-color: #fff; color: #000; }
-    body.light .task { background-color: #f3f4f6; color: #111827; border-color: #d1d5db; }
-    body.light .tasks.drag-over { background-color: #e5e7eb; border-color: #9ca3af; }
-    body.light input, body.light button { background-color: #fff; color: #111827; }
-    body {
-    transition: opacity 0.4s ease; font-family: 'Inter', sans-serif; background-color: #000; color: #fff; margin: 0; padding: 0; min-height: 100vh; }
-    header { display: flex; align-items: center; padding: 2rem; cursor: pointer; }
-    .logo { width: 2.25rem; height: 2.25rem; background: #fff; border-radius: 50%; display: inline-block; box-shadow: 0 0 0 2px #fff inset; margin-right: 1rem; }
-    .page-title { font-weight: 700; font-size: 2rem; text-transform: uppercase; }
-    .line-through input[type="text"] { text-decoration: line-through; border: none; color: #aaa; }
-    .stat { font-size: 0.875rem; color: #9ca3af; margin-top: 0.5rem; }
-    .tasks.drag-over {
-      outline: 2px dashed rgba(255, 255, 255, 0.4);
-      border-radius: 0.5rem;
-      opacity: 0.7;
-      border-color: rgba(255, 255, 255, 0.4);
-      transition: border-color 0.2s ease-in-out;
-      background-color: rgba(255, 255, 255, 0.05);
-    }
-    .section-hover:hover {
-  transform: scale(1.01);
-  background-color: rgba(255, 255, 255, 0.03);
-  box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
-}
-  .section-hover {
-  transition: all 0.35s ease-in-out;
-  transition-delay: 0.05s;
-}
-  .section-hover:hover {
-    transform: scale(1.01);
-    background-color: rgba(255, 255, 255, 0.03);
-    box-shadow: 0 0 12px rgba(255, 255, 255, 0.2);
-  }
-  
-</style>
-</head>
-<body class="dark">
-  <header>
-  <span class="logo"></span>
-  <h1 class="page-title">Aura</h1>
-</header>
-  <div class="px-4 pb-2 flex gap-2">
-  <button id="reset-btn" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition">Reset</button>
-  <button id="theme-toggle" class="text-xs uppercase tracking-wide border border-white px-3 py-1 rounded hover:bg-white hover:text-black transition flex items-center justify-center">
-  <svg xmlns="http://www.w3.org/2000/svg" class="w-4 h-4" viewBox="0 0 24 24" fill="currentColor">
-  <path id="theme-icon" d="M12 2.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75Zm0 16.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75ZM4.72 4.72a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L4.72 5.78a.75.75 0 0 1 0-1.06Zm12.5 12.5a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06l-1.06-1.06a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm16.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM5.78 18.22a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 0 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0Zm12.5-12.5a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0ZM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Z" />
-</svg>
-</button>
-</div>
-  <main class="p-4 space-y-6">
-    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-  <div class="border-2 border-white rounded-lg p-4 section-hover">
-    <h2 class="text-lg font-semibold mb-2">Today's Targets</h2>
-    <div class="space-y-2" id="targets">
-      <div class="flex items-center justify-between border border-white p-2 rounded">
-        <input type="text" placeholder="Target 1" class="bg-black text-white w-full focus:outline-none" />
-        <input type="checkbox" class="ml-2 accent-white" />
-      </div>
-      <div class="flex items-center justify-between border border-white p-2 rounded">
-        <input type="text" placeholder="Target 2" class="bg-black text-white w-full focus:outline-none" />
-        <input type="checkbox" class="ml-2 accent-white" />
-      </div>
-      <div class="flex items-center justify-between border border-white p-2 rounded">
-        <input type="text" placeholder="Target 3" class="bg-black text-white w-full focus:outline-none" />
-        <input type="checkbox" class="ml-2 accent-white" />
-      </div>
-    </div>
-    <div id="target-stats" class="stat">Completed Targets: 0 / 3</div>
-  </div>
-
-  <div class="border-2 border-white rounded-lg p-4 section-hover">
-    <h2 class="text-lg font-semibold mb-2">Add Task</h2>
-    <input type="text" id="new-task-input" placeholder="New task..." class="w-full bg-black border border-white p-2 text-white mb-2">
-    <button id="add-task-btn" class="w-full border border-white py-2">Add</button>
-    <p id="error-message" class="text-white text-sm text-opacity-80 hidden mt-2">Please enter a task.</p>
-    <div id="task-stats" class="stat">Completed Tasks: 0</div>
-  </div>
-
-  <div class="border-2 border-white rounded-lg p-4 section-hover">
-    <h2 class="text-lg font-semibold mb-2">Pomodoro</h2>
-    <div id="pomodoro-time-display" class="text-3xl font-bold mb-2">25:00</div>
-    <div class="space-x-2 mb-4">
-      <button id="pomodoro-start-pause" class="border border-white px-4 py-1">Start</button>
-      <button id="pomodoro-reset" class="border border-white px-4 py-1">Reset</button>
-    </div>
-    <div>
-      <label>Work: <span id="work-value">25</span> min</label>
-      <input type="range" id="work-duration" min="5" max="60" value="25" class="w-full accent-white">
-      <label>Break: <span id="break-value">5</span> min</label>
-      <input type="range" id="break-duration" min="1" max="30" value="5" class="w-full accent-white">
-    </div>
-    <div id="pomodoro-status" class="text-sm mt-2 text-gray-400">Ready to work!</div>
-    <div id="pomodoro-count" class="stat">Completed Sessions: 0</div>
-  </div>
-</section>
-
-<section class="grid grid-cols-1 md:grid-cols-3 gap-4">
-  <div class="border-2 border-white rounded-lg section-hover">
-    <h2 class="text-lg font-semibold border-b border-white p-2">To Do</h2>
-    <div class="tasks p-2 space-y-2" id="todo-column"></div>
-  </div>
-  <div class="border-2 border-white rounded-lg section-hover">
-    <h2 class="text-lg font-semibold border-b border-white p-2">In Progress</h2>
-    <div class="tasks p-2 space-y-2" id="inprogress-column"></div>
-  </div>
-  <div class="border-2 border-white rounded-lg section-hover">
-    <h2 class="text-lg font-semibold border-b border-white p-2">Done</h2>
-    <div class="tasks p-2 space-y-2" id="done-column"></div>
-  </div>
-</section>
-  </main>
-  <script>
-  window.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('theme-toggle')?.addEventListener('click', () => {
-  const iconPath = document.getElementById('theme-icon');
-
-      const isLight = document.body.classList.toggle('light');
-      document.body.classList.toggle('dark', !isLight);
-      localStorage.setItem('theme', isLight ? 'light' : 'dark');
-  if (iconPath) {
-    iconPath.setAttribute('d', 'M12 2.25a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V3a.75.75 0 0 1 .75-.75Zm0 16.5a.75.75 0 0 1 .75.75v1.5a.75.75 0 0 1-1.5 0V19.5a.75.75 0 0 1 .75-.75ZM4.72 4.72a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06L4.72 5.78a.75.75 0 0 1 0-1.06Zm12.5 12.5a.75.75 0 0 1 1.06 0l1.06 1.06a.75.75 0 1 1-1.06 1.06l-1.06-1.06a.75.75 0 0 1 0-1.06ZM2.25 12a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5H3a.75.75 0 0 1-.75-.75Zm16.5 0a.75.75 0 0 1 .75-.75h1.5a.75.75 0 0 1 0 1.5h-1.5a.75.75 0 0 1-.75-.75ZM5.78 18.22a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 0 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0Zm12.5-12.5a.75.75 0 0 1 0-1.06l1.06-1.06a.75.75 0 1 1 1.06 1.06l-1.06 1.06a.75.75 0 0 1-1.06 0ZM12 6.75a5.25 5.25 0 1 0 0 10.5 5.25 5.25 0 0 0 0-10.5Z');
-  }
-    });
-
-    const savedTheme = localStorage.getItem('theme');
-    if (savedTheme) {
-      document.body.classList.remove('light', 'dark');
-      document.body.classList.add(savedTheme);
-    }
-
-    document.getElementById('reset-btn')?.addEventListener('click', () => {
-  document.body.classList.add('opacity-0');
-  setTimeout(() => location.reload(), 400);
-});
-  });
-</script>
-<div id="toast" class="fixed bottom-4 left-1/2 transform -translate-x-1/2 bg-white text-black px-4 py-2 rounded shadow opacity-0 pointer-events-none transition-opacity duration-500 z-50">Reset successful</div>
 </body>
 </html>
